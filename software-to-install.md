@@ -2,7 +2,7 @@
 
 ###Install/update R and RStudio:
 
-- Update R to 3.5.1: https://cran.r-project.org/ (use link at top for *precompiled binary*. **Skip if you already have R version 3.5.1**
+- Update R to 3.5.3: https://cran.r-project.org/ (use link at top for *precompiled binary*. **Skip if you already have R version 3.5.something**
 - Install RStudio (if you don't have it already installed): https://www.rstudio.com/products/rstudio/download/. **NOTE: install the FREE version.**
 
 ###R packages to install:
