@@ -39,9 +39,13 @@ y$genes$Symbol <- mapIds(org.Mm.eg.db, rownames(y),
 
 head(y$genes)
 dim(y$genes) # 27179 rows (genes) & 2 columns
+which(is.na(y$genes$Symbol)) %>% length
+is.na(y$genes$Symbol) %>% sum
 
 # DGEList objects can be subset by rows (genes) and columns (samples) just like a matrix or data frame
 y <- y[!is.na(y$genes$Symbol), ] # remove genes without a symbol (i.e. abbreviated name)
+y <- y[is.na(y$genes$Symbol) %>% not, ]
+
 dim(y) # 26221 genes left
 
 # Remove genes with very low counts
@@ -53,6 +57,8 @@ y <- y[keep, , keep.lib.sizes=FALSE] # keep.lib.sizes=FALSE causes the library s
 
 # Normalization ---------
 y <- calcNormFactors(y)
+str(y)
+y %>% str
 y$samples
 
 # Use plotMDS for QC check and for data exploration ----------
@@ -102,11 +108,22 @@ con <- makeContrasts(
 anov <- glmQLFTest(fit, contrast=con)
 topTags(anov)
 
+con <- makeContrasts(
+  pre = L.pregnant - B.pregnant,
+  lac = L.lactating - B.lactating,
+  vir = L.virgin - B.virgin, levels=design)
+
+anov <- glmQLFTest(fit, contrast=con)
+topTags(anov)
+
 # EXERCISE:
-# How would you setup the contrast to find genes that are DE between all luminal (L) cells and all basal (B) cells?
+# How would you setup the contrast to find genes that are DE between all luminal (L) cells versus all basal (B) cells?
 
 LvB <- glmQLFTest(fit, contrast = c(-1/3,-1/3,-1/3,1/3,1/3,1/3) )
-
+LvB <- glmQLFTest(fit, 
+                  contrast = makeContrasts(contrasts = (L.lactating+L.pregnant+L.virgin)/3 - 
+                                             (B.lactating+B.pregnant+B.virgin)/3) ,
+                  levels = design)
 
 # Let's try a more typical model with an intercept, and main and interaction effects ------------
 
@@ -116,9 +133,11 @@ targets$CellType %<>% factor
 targets$CellType %>% levels # The default alphanumeric sorting is the same as the order we want in this case
 
 targets$Status %<>% factor(levels = c("virgin", "pregnant", "lactating"))
+targets$Status <- targets$Status %>% factor(levels = c("virgin", "pregnant", "lactating"))
 targets$Status %>% levels
 
 design <- model.matrix( ~ 1 + CellType + Status + CellType:Status, data = targets)
+design <- model.matrix( ~ 1 + CellType*Status, data = targets)
 colnames(design)
 design
 # The intercept represents the combination of the reference levels for both predictor variables: B (Basal) & virgin
