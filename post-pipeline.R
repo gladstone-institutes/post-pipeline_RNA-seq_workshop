@@ -7,6 +7,8 @@ setwd("~/git.repos/ilab.repos/post-pipeline_RNA-seq_workshop/")
 library(magrittr) # for programming pipes
 library(edgeR) # for differential expression analysis
 library(org.Mm.eg.db) # for mouse gene annotation
+library(ggplot2) # to visualize parts of the linear model
+library(reshape2) # to reformat data for plotting
 
 # Load experimental metadata
 targets <- read.delim("targets.txt", stringsAsFactors=FALSE)
@@ -21,6 +23,7 @@ table(group) # 2 reps per group or experimental condition combination
 GenewiseCounts <- read.delim("GSE60450_Lactation-GenewiseCounts.txt.gz",
                              row.names="EntrezGeneID")
 
+colnames(GenewiseCounts) <- colnames(GenewiseCounts) %>% substring(.,1,7)
 colnames(GenewiseCounts) %<>% substring(.,1,7) # trim column names to match those in `targets`
 dim(GenewiseCounts)
 GenewiseCounts %>% head
@@ -82,7 +85,27 @@ y <- estimateDisp(y, design, robust=TRUE) # using robust=TRUE is recommended
 # Test different hypotheses/comparisons using a joint model fit --------
 # Fit the above model (as specified in the design matrix) to the data
 fit <- glmQLFit(y, design, robust=TRUE) # another option is to use glmFit
-head(fit$coefficients)
+head(fit$coefficients %>% exp)
+
+fit %>% names
+fit$fitted.values %>% head
+fit$AveLogCPM %>% str
+
+fit$design %>% colnames
+edgeR::cpm(y, log = T) %>% head
+
+
+grp.model.tests <- lapply(1:6, FUN = function(i) glmQLFTest(fit, coef = i) )
+
+lapply(grp.model.tests, FUN = function(coef.test) topTags(coef.test) )
+
+lapply(grp.model.tests, FUN = function(coef.test) decideTestsDGE(coef.test) %>% summary ) %>% 
+  do.call(cbind, .)
+
+grp.model.tests %>% str
+
+ggplot(data = fit,
+       aes())
 
 # Test DE between the basal pregnant and lactating groups
 # Construct the contrast for the comparison of interest
@@ -96,7 +119,7 @@ summary(decideTests(qlf)) # Summary of DE genes
 
 # This is an equivalent numerical way of specifying the same contrast: 
 qlf <- glmQLFTest(fit, contrast = c(-1,1,0,0,0,0) ) # ...since we're contrasting the 2nd coefficient against the 1st
-# NOTE: the contrasts *must* sum to 1
+# NOTE: the contrasts *must* sum to 0
 
 # The following is an example of how to use the F test to obtain a joint p-value
 # for several contrasts/comparisons, in ANOVA fashion:
@@ -120,10 +143,12 @@ topTags(anov)
 # How would you setup the contrast to find genes that are DE between all luminal (L) cells versus all basal (B) cells?
 
 LvB <- glmQLFTest(fit, contrast = c(-1/3,-1/3,-1/3,1/3,1/3,1/3) )
-LvB <- glmQLFTest(fit, 
-                  contrast = makeContrasts(contrasts = (L.lactating+L.pregnant+L.virgin)/3 - 
-                                             (B.lactating+B.pregnant+B.virgin)/3) ,
-                  levels = design)
+# LvB <- glmQLFTest(fit, 
+#                   contrast = makeContrasts(contrasts = ("L.lactating+L.pregnant+L.virgin")/3 - 
+#                                              ("B.lactating+B.pregnant+B.virgin"
+#                                               )/3) ,
+#                   levels = design))
+summary(decideTests(LvB))
 
 # Let's try a more typical model with an intercept, and main and interaction effects ------------
 
@@ -146,10 +171,14 @@ design
 y <- estimateDisp(y, design, robust=TRUE)
 
 fit <- glmQLFit(y, design, robust=TRUE) # using robust=TRUE is recommended
-head(fit$coefficients)
+head(fit$coefficients %>% exp)
+fit$AveLogCPM %>% head
 
 # Let's build a quick summary of DE results of testing all the coefficients (except for the intercept)
 int.model.tests <- lapply(2:6, FUN = function(i) glmQLFTest(fit, coef = i) )
+int.model.tests %>% length
+int.model.tests[[1]] %>% topTags
+int.model.tests %>% names
 lapply(int.model.tests, FUN = function(coef.test) decideTestsDGE(coef.test) %>% summary ) %>% 
   do.call(cbind, .)
 
